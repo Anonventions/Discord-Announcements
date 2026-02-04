@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Discord Architect | Pro Message Creator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            /* Discord Modern Palette */
+            --bg-dark: #1e1f22; /* App background */
+            --bg-sidebar: #2b2d31; /* Sidebar/Card */
+            --bg-input: #383a40; /* Inputs */
+            --accent: #5865F2; /* Blurple */
+            --accent-hover: #4752c4;
+            --text-main: #dbdee1;
+            --text-muted: #949ba4;
+            --header-white: #f2f3f5;
+            --danger: #da373c;
+            --success: #23a559;
+            --divider: #1e1f22;
+            --code-bg: #2b2d31;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'gg sans', 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- LAYOUT --- */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Left Side: Editor */
+        .editor-pane {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #111;
+            background-color: var(--bg-sidebar);
+            position: relative;
+        }
+
+        /* Right Side: Preview */
+        .preview-pane {
+            width: 50%;
+            padding: 24px;
+            background-color: #313338; /* New Discord light-dark bg */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- TOOLBAR --- */
+        .toolbar {
+            padding: 12px 16px;
+            background-color: var(--bg-sidebar);
+            border-bottom: 1px solid var(--divider);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 4px;
+            padding-right: 12px;
+            margin-right: 8px;
+            border-right: 1px solid #404249;
+        }
+        .tool-group:last-child { border: none; }
+
+        .btn-tool {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .btn-tool:hover { background-color: var(--bg-input); color: var(--text-main); }
+        .btn-tool:active { transform: translateY(1px); }
+        
+        /* Magic Button */
+        .btn-magic {
+            background: linear-gradient(135deg, #6a4c93, #a259ff);
+            color: white;
+            font-weight: bold;
+            border: none;
+            box-shadow: 0 2px 10px rgba(162, 89, 255, 0.3);
+        }
+        .btn-magic:hover { filter: brightness(1.1); color: white; }
+
+        /* --- INPUT AREA --- */
+        .input-wrapper {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        textarea {
+            flex-grow: 1;
+            width: 100%;
+            background-color: var(--bg-sidebar);
+            border: none;
+            padding: 20px;
+            color: var(--text-main);
+            font-family: 'Consolas', 'Monaco', monospace; /* Monospace for editing precision */
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            line-height: 1.6;
+        }
+
+        .status-bar {
+            padding: 8px 16px;
+            background-color: var(--bg-dark);
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #111;
+        }
+
+        .copy-btn {
+            background-color: var(--success);
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 3px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background-color: #1e8e4a; }
+
+        /* --- PREVIEW STYLES (Pixel Perfect Discord) --- */
+        .preview-header {
+            margin-bottom: 20px;
+            user-select: none;
+        }
+        
+        .discord-msg-container {
+            display: flex;
+            gap: 16px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: url('https://cdn.discordapp.com/embed/avatars/0.png');
+            background-size: cover;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .avatar:hover { opacity: 0.8; }
+
+        .msg-body {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .msg-meta {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .username { color: var(--header-white); font-weight: 500; font-size: 16px; }
+        .timestamp-meta { color: var(--text-muted); font-size: 12px; }
+
+        /* Content Rendering */
+        .markdown-content {
+            font-size: 16px;
+            line-height: 1.375rem;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Specific Markdown Elements */
+        .md-h1 { font-size: 24px; font-weight: 700; color: var(--header-white); margin: 12px 0 6px; }
+        .md-h2 { font-size: 20px; font-weight: 700; color: var(--header-white); margin: 12px 0 6px; border-bottom: 1px solid #3f4147; padding-bottom: 4px; }
+        .md-h3 { font-size: 16px; font-weight: 700; color: var(--header-white); margin: 12px 0 6px; }
+        
+        .md-subtext { font-size: 12px; color: var(--text-muted); line-height: 1.3; } /* The new -# feature */
+
+        .md-bold { font-weight: 700; }
+        .md-italic { font-style: italic; }
+        .md-underline { text-decoration: underline; }
+        .md-strike { text-decoration: line-through; }
+        
+        .md-code-inline {
+            background-color: #1e1f22;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 85%;
+        }
+
+        .md-code-block {
+            background-color: #2b2d31;
+            border: 1px solid #1e1f22;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--text-main);
+            margin: 6px 0;
+            display: block;
+        }
+
+        .md-quote {
+            display: flex;
+            margin: 4px 0;
+        }
+        .md-quote-bar {
+            width: 4px;
+            border-radius: 4px;
+            background-color: #4e5058;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .md-spoiler { background-color: #202225; color: transparent; border-radius: 3px; cursor: pointer; transition: 0.1s; }
+        .md-spoiler:hover { background-color: #40444b; color: var(--text-main); }
+        
+        .md-timestamp {
+            background-color: rgba(88, 101, 242, 0.15);
+            color: var(--text-main);
+            border-radius: 3px;
+            padding: 0 2px;
+            font-size: 90%;
+            cursor: help;
+        }
+
+        /* Modal for Timestamp */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .modal {
+            background: var(--bg-sidebar);
+            padding: 20px;
+            border-radius: 8px;
+            width: 350px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .modal h3 { margin-top: 0; color: var(--header-white); }
+        .modal input, .modal select {
+            width: 100%; padding: 10px; margin: 10px 0;
+            background: var(--bg-input); border: none; color: white; border-radius: 4px;
+        }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="editor-pane">
+        <div class="toolbar">
+            <div class="tool-group">
+                <button class="btn-tool" onclick="insert('# ')" title="Big Header (H1)">H1</button>
+                <button class="btn-tool" onclick="insert('## ')" title="Medium Header (H2)">H2</button>
+                <button class="btn-tool" onclick="insert('### ')" title="Small Header (H3)">H3</button>
+                <button class="btn-tool" onclick="insert('-# ')" title="Subtext (Small Gray Text)"><i class="fas fa-text-height"></i> small</button>
+            </div>
+            
+            <div class="tool-group">
+                <button class="btn-tool" onclick="wrap('**')" title="Bold"><i class="fas fa-bold"></i></button>
+                <button class="btn-tool" onclick="wrap('*')" title="Italic"><i class="fas fa-italic"></i></button>
+                <button class="btn-tool" onclick="wrap('__')" title="Underline"><i class="fas fa-underline"></i></button>
+                <button class="btn-tool" onclick="wrap('~~')" title="Strikethrough"><i class="fas fa-strikethrough"></i></button>
+                <button class="btn-tool" onclick="wrap('||')" title="Spoiler"><i class="fas fa-eye-slash"></i></button>
+            </div>
+
+            <div class="tool-group">
+                <button class="btn-tool" onclick="insert('> ')" title="Quote"><i class="fas fa-quote-right"></i></button>
+                <button class="btn-tool" onclick="wrap('`')" title="Inline Code"><i class="fas fa-code"></i></button>
+                <button class="btn-tool" onclick="wrapBlock('```')" title="Code Box"><i class="fas fa-file-code"></i></button>
+                <button class="btn-tool" onclick="insertLine()" title="Separator Line"><i class="fas fa-minus"></i></button>
+            </div>
+
+            <div class="tool-group">
+                <button class="btn-tool" onclick="openTimeModal()" title="Timestamp Generator"><i class="fas fa-clock"></i> Time</button>
+            </div>
+
+            <button class="btn-tool btn-magic" onclick="smartBeautify()" title="Auto-Format Messy Text">✨ Smart Format</button>
+        </div>
+
+        <div class="input-wrapper">
+            <textarea id="editor" placeholder="Type here... Use the magic wand to fix messy text!" oninput="updatePreview()"></textarea>
+        </div>
+
+        <div class="status-bar">
+            <span id="charCount">0 / 2000</span>
+            <button class="copy-btn" onclick="copyText()">Copy Discord Ready Text</button>
+        </div>
+    </div>
+
+    <div class="preview-pane">
+        <div class="preview-header">
+            <h3 style="margin: 0; color: #80848e; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px;">Live Preview</h3>
+        </div>
+        
+        <div class="discord-msg-container">
+            <div class="avatar"></div>
+            <div class="msg-body">
+                <div class="msg-meta">
+                    <span class="username">Server Admin</span>
+                    <span class="timestamp-meta">Today at 4:20 PM</span>
+                </div>
+                <div id="preview" class="markdown-content">
+                    <span style="color: #6d6f78; font-style: italic;">Start typing to see the preview...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="timeModal" class="modal-overlay">
+    <div class="modal">
+        <h3>Timestamp Generator</h3>
+        <p style="color: #bbb; font-size: 13px;">Pick a date/time to generate a dynamic discord tag (e.g. "in 5 minutes", "next Monday").</p>
+        
+        <input type="datetime-local" id="tsInput">
+        
+        <label style="color: #bbb; font-size: 12px;">Display Style:</label>
+        <select id="tsType">
+            <option value="R">Relative (e.g., "in 2 hours")</option>
+            <option value="t">Short Time (e.g., "4:20 PM")</option>
+            <option value="T">Long Time (e.g., "4:20:00 PM")</option>
+            <option value="d">Short Date (e.g., "02/05/2026")</option>
+            <option value="D">Long Date (e.g., "February 5, 2026")</option>
+            <option value="f">Short Date/Time</option>
+            <option value="F">Long Date/Time</option>
+        </select>
+
+        <div class="modal-footer">
+            <button class="btn-tool" onclick="document.getElementById('timeModal').style.display='none'">Cancel</button>
+            <button class="copy-btn" onclick="insertTimestamp()">Insert</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const charCount = document.getElementById('charCount');
+
+    // --- 1. EDITOR TOOLS ---
+
+    function insert(text) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const val = editor.value;
+        editor.value = val.substring(0, start) + text + val.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + text.length;
+        editor.focus();
+        updatePreview();
+    }
+
+    function wrap(tag) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const val = editor.value;
+        const selected = val.substring(start, end);
+        editor.value = val.substring(0, start) + tag + selected + tag + val.substring(end);
+        editor.selectionStart = start + tag.length;
+        editor.selectionEnd = end + tag.length;
+        editor.focus();
+        updatePreview();
+    }
+
+    function wrapBlock(tag) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const val = editor.value;
+        const selected = val.substring(start, end);
+        // Ensure newlines for blocks
+        const newText = `\n${tag}\n${selected}\n${tag}\n`;
+        editor.value = val.substring(0, start) + newText + val.substring(end);
+        editor.focus();
+        updatePreview();
+    }
+
+    function insertLine() {
+        insert('\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n');
+    }
+
+    // --- 2. PREVIEW RENDERER ---
+
+    function updatePreview() {
+        let text = editor.value;
+        
+        // Char Count
+        charCount.textContent = `${text.length} / 2000`;
+        charCount.style.color = text.length > 2000 ? 'var(--danger)' : 'var(--text-muted)';
+
+        // Escape HTML
+        text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        // --- Custom Parser mimicking Discord's Markdown ---
+
+        // 1. Code Blocks (High Priority)
+        text = text.replace(/```([\s\S]*?)```/g, '<div class="md-code-block">$1</div>');
+        // 2. Inline Code
+        text = text.replace(/`([^`]+)`/g, '<span class="md-code-inline">$1</span>');
+
+        // 3. Headers & Subtext
+        text = text.replace(/^# (.*$)/gim, '<div class="md-h1">$1</div>');
+        text = text.replace(/^## (.*$)/gim, '<div class="md-h2">$1</div>');
+        text = text.replace(/^### (.*$)/gim, '<div class="md-h3">$1</div>');
+        text = text.replace(/^-# (.*$)/gim, '<div class="md-subtext">$1</div>');
+
+        // 4. Basic Styles
+        text = text.replace(/\*\*(.*?)\*\*/g, '<span class="md-bold">$1</span>');
+        text = text.replace(/\*([^\*]+)\*/g, '<span class="md-italic">$1</span>');
+        text = text.replace(/__([^_]+)__/g, '<span class="md-underline">$1</span>');
+        text = text.replace(/~~([^~]+)~~/g, '<span class="md-strike">$1</span>');
+        text = text.replace(/\|\|(.*?)\|\|/g, '<span class="md-spoiler">$1</span>');
+
+        // 5. Timestamps <t:12345:R>
+        text = text.replace(/&lt;t:(\d+):([a-zA-Z])&gt;/g, (match, time, style) => {
+            // Visualize the timestamp based on style
+            const date = new Date(parseInt(time) * 1000);
+            let display = "";
+            if(style === 'R') display = "in 2 hours"; // Mock relative
+            else if (style === 't') display = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            else if (style === 'D') display = date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+            else display = date.toLocaleString();
+            
+            return `<span class="md-timestamp">${display}</span>`;
+        });
+
+        // 6. Blockquotes (Line based)
+        let lines = text.split('\n');
+        let output = "";
+        lines.forEach(line => {
+            if(line.startsWith('&gt; ')) {
+                output += `<div class="md-quote"><div class="md-quote-bar"></div><div>${line.substring(5)}</div></div>`;
+            } else if (!line.includes('md-h') && !line.includes('md-code')) {
+                output += line + '<br>';
+            } else {
+                output += line;
+            }
+        });
+
+        preview.innerHTML = output;
+    }
+
+    // --- 3. SMART AI BEAUTIFY ---
+    // A heuristic engine to clean messy text
+    function smartBeautify() {
+        let val = editor.value;
+
+        // 1. Normalize line breaks
+        val = val.replace(/\n{3,}/g, '\n\n'); 
+
+        // 2. Auto-Header: If a line is short, uppercase, and followed by newline, make it a Header 2
+        // Regex looks for: Start of line, Uppercase words, no punctuation, max 30 chars
+        val = val.replace(/^([A-Z\s]{3,30})$/gm, '## $1');
+
+        // 3. Auto-Bullets: Convert " - " or "*" at start of line to bullet points (•)
+        // Discord doesn't support real bullets, but using unicode bullets or "- " is standard.
+        // Let's standardise to "- "
+        val = val.replace(/^[\*•]\s?/gm, '- ');
+
+        // 4. Keyword highlighting
+        const keywords = ["Note:", "Warning:", "Important:", "Update:", "Date:", "Time:"];
+        keywords.forEach(kw => {
+            // Regex to wrap keyword in ** if not already wrapped
+            const re = new RegExp(`(?<!\\*\\*)${kw}(?!\\*\\*)`, 'g');
+            val = val.replace(re, `**${kw}**`);
+        });
+
+        // 5. Add separator after headers
+        // If there is ## Header, ensure there isn't a line immediately after
+        // (Just ensure clean spacing)
+        
+        // 6. Fix "Link: url" spacing
+        val = val.replace(/(http[s]?:\/\/[^\s]+)/g, ' $1 ');
+
+        editor.value = val;
+        updatePreview();
+        
+        // Visual Feedback
+        const btn = document.querySelector('.btn-magic');
+        btn.innerHTML = "✨ Done!";
+        setTimeout(() => btn.innerHTML = "✨ Smart Format", 1500);
+    }
+
+    // --- 4. TIMESTAMP MODAL ---
+    function openTimeModal() {
+        document.getElementById('timeModal').style.display = 'flex';
+        // Set default to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('tsInput').value = now.toISOString().slice(0,16);
+    }
+
+    function insertTimestamp() {
+        const input = document.getElementById('tsInput').value;
+        const style = document.getElementById('tsType').value;
+        
+        if(input) {
+            const unix = Math.floor(new Date(input).getTime() / 1000);
+            const discordTag = `<t:${unix}:${style}>`;
+            insert(discordTag);
+        }
+        document.getElementById('timeModal').style.display = 'none';
+    }
+
+    // --- 5. UTILS ---
+    function copyText() {
+        editor.select();
+        navigator.clipboard.writeText(editor.value);
+        const btn = document.querySelector('.copy-btn');
+        btn.textContent = "Copied!";
+        btn.style.backgroundColor = "#fff";
+        btn.style.color = "var(--success)";
+        setTimeout(() => {
+            btn.textContent = "Copy Discord Ready Text";
+            btn.style.backgroundColor = "var(--success)";
+            btn.style.color = "white";
+        }, 2000);
+    }
+
+    // Init with example
+    window.onload = function() {
+        if(editor.value === "") {
+            editor.value = "## ANNOUNCEMENT\n\nWelcome to the new formatter.\n\n### How to use\n- Type on the left\n- See results on the right\n- Use the **Magic Wand** to clean up messy text.\n\n-# (This tool was created for you)";
+            updatePreview();
+        }
+    }
+
+</script>
+</body>
+</html> 
